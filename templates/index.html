@@ -331,7 +331,7 @@
         }
         
         .schedule-time input {
-            width: 100px;
+            width: 200px;
             padding: 8px;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
@@ -722,9 +722,10 @@
             <div class="container">
                 <!-- 탭 메뉴 -->
                 <div style="display:flex; gap:5px; margin-bottom:15px; background:white; border-radius:12px; padding:5px;">
-                    <button id="adminTab1" class="btn" style="flex:1; background:#4F46E5; color:white; padding:10px;" onclick="showAdminTab('status')">출퇴근 현황</button>
-                    <button id="adminTab2" class="btn" style="flex:1; background:#e5e7eb; color:#374151; padding:10px;" onclick="showAdminTab('hours')">근무시간</button>
-                    <button id="adminTab3" class="btn" style="flex:1; background:#e5e7eb; color:#374151; padding:10px;" onclick="showAdminTab('team')">팀 관리</button>
+                    <button id="adminTab1" class="btn" style="flex:1; background:#4F46E5; color:white; padding:10px; font-size:12px;" onclick="showAdminTab('status')">출퇴근 현황</button>
+                    <button id="adminTab2" class="btn" style="flex:1; background:#e5e7eb; color:#374151; padding:10px; font-size:12px;" onclick="showAdminTab('hours')">근무시간</button>
+                    <button id="adminTab3" class="btn" style="flex:1; background:#e5e7eb; color:#374151; padding:10px; font-size:12px;" onclick="showAdminTab('employees')">직원 관리</button>
+                    <button id="adminTab4" class="btn" style="flex:1; background:#e5e7eb; color:#374151; padding:10px; font-size:12px;" onclick="showAdminTab('settings')">설정</button>
                 </div>
                 
                 <!-- 출퇴근 현황 탭 -->
@@ -743,14 +744,59 @@
                     <div id="adminHoursList"></div>
                 </div>
                 
-                <!-- 팀 관리 탭 -->
-                <div id="adminTeamTab" class="card" style="display:none;">
-                    <div class="card-title">🏢 팀 관리</div>
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <input type="text" id="newTeamName" placeholder="새 팀 이름" style="flex:1; padding:10px; border:1px solid #e5e7eb; border-radius:8px;">
-                        <button class="btn" style="background:#4F46E5; color:white; padding:10px 20px;" onclick="createTeam()">추가</button>
+                <!-- 직원 관리 탭 -->
+                <div id="adminEmployeesTab" class="card" style="display:none;">
+                    <div class="card-title">👥 직원 관리</div>
+                    <div id="employeesList"></div>
+                </div>
+                
+                <!-- 설정 탭 -->
+                <div id="adminSettingsTab" class="card" style="display:none;">
+                    <div class="card-title">⚙️ 설정</div>
+                    
+                    <!-- 회사 위치 설정 -->
+                    <div style="margin-bottom:20px; padding:15px; background:#f3f4f6; border-radius:10px;">
+                        <div style="font-weight:600; margin-bottom:10px;">📍 회사 위치 설정</div>
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <div style="flex:1;">
+                                <label style="font-size:12px; color:#6b7280;">위도</label>
+                                <input type="number" id="settingLatitude" step="0.0001" style="width:100%; padding:8px; border:1px solid #e5e7eb; border-radius:6px;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:12px; color:#6b7280;">경도</label>
+                                <input type="number" id="settingLongitude" step="0.0001" style="width:100%; padding:8px; border:1px solid #e5e7eb; border-radius:6px;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label style="font-size:12px; color:#6b7280;">출근 허용 반경 (미터)</label>
+                            <input type="number" id="settingRadius" style="width:100%; padding:8px; border:1px solid #e5e7eb; border-radius:6px;">
+                        </div>
+                        <button class="btn" style="width:100%; background:#4F46E5; color:white; padding:10px;" onclick="saveSettings()">위치 설정 저장</button>
                     </div>
-                    <div id="adminTeamList"></div>
+                    
+                    <!-- 팀 관리 -->
+                    <div style="padding:15px; background:#f3f4f6; border-radius:10px;">
+                        <div style="font-weight:600; margin-bottom:10px;">🏢 팀 관리</div>
+                        <div style="display:flex; gap:10px; margin-bottom:15px;">
+                            <input type="text" id="newTeamName" placeholder="새 팀 이름" style="flex:1; padding:10px; border:1px solid #e5e7eb; border-radius:8px;">
+                            <button class="btn" style="background:#4F46E5; color:white; padding:10px 20px;" onclick="createTeam()">추가</button>
+                        </div>
+                        <div id="adminTeamList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 직원 상세 팝업 -->
+        <div id="employeeDetailModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-title">📋 <span id="employeeDetailName"></span> 출퇴근 내역</div>
+                <div style="margin-bottom:15px;">
+                    <input type="date" id="employeeDetailDate" onchange="loadEmployeeDetail()" style="width:100%; padding:10px; border:1px solid #e5e7eb; border-radius:8px;">
+                </div>
+                <div id="employeeDetailContent"></div>
+                <div class="modal-buttons">
+                    <button class="btn" style="width:100%; background:#e5e7eb; color:#374151;" onclick="closeEmployeeDetailModal()">닫기</button>
                 </div>
             </div>
         </div>
@@ -1508,6 +1554,11 @@
         async function loadAdminStatus() {
             const data = await fetch(`${API_BASE}/api/admin/all-status`).then(r => r.json());
             
+            if (data.length === 0) {
+                document.getElementById('adminList').innerHTML = '<div style="text-align:center; color:#9ca3af; padding:20px;">등록된 직원이 없습니다</div>';
+                return;
+            }
+            
             document.getElementById('adminList').innerHTML = data.map(m => {
                 let statusClass = 'not-working';
                 if (m.status === '근무중') statusClass = 'working';
@@ -1521,21 +1572,13 @@
                     ? (m.clock_out ? `${m.clock_in}~${m.clock_out} (${hours}시간 ${mins}분)` : `${m.clock_in} 출근`)
                     : '-';
                 
-                const isAdmin = m.role === 'admin';
-                const roleBtn = isAdmin 
-                    ? `<button onclick="changeRole(${m.id}, 'member')" style="background:#EF4444; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:12px; cursor:pointer;">👑 해제</button>`
-                    : `<button onclick="changeRole(${m.id}, 'admin')" style="background:#4F46E5; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:12px; cursor:pointer;">관리자 지정</button>`;
-                
-                return `<div class="member-card">
+                return `<div class="member-card" style="cursor:pointer;" onclick="openEmployeeDetail(${m.id}, '${m.name}')">
                     <div class="member-avatar">${emoji}</div>
                     <div class="member-info">
-                        <div class="member-name">${m.name} ${isAdmin ? '👑' : ''} <span style="font-size:12px; color:#9ca3af;">${m.team || ''}</span></div>
+                        <div class="member-name">${m.name} <span style="font-size:12px; color:#9ca3af;">${m.team || ''}</span></div>
                         <div class="member-schedule">${timeInfo}</div>
                     </div>
-                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
-                        <div class="member-status ${statusClass}">${m.status}</div>
-                        ${roleBtn}
-                    </div>
+                    <div class="member-status ${statusClass}">${m.status}</div>
                 </div>`;
             }).join('');
         }
@@ -1553,7 +1596,7 @@
                 
                 const data = await res.json();
                 showToast(data.message);
-                await loadAdminStatus();
+                await loadEmployeesList();
             } catch (e) {
                 showToast('권한 변경 실패');
             }
@@ -1569,15 +1612,14 @@
             // 모든 탭 숨기기
             document.getElementById('adminStatusTab').style.display = 'none';
             document.getElementById('adminHoursTab').style.display = 'none';
-            document.getElementById('adminTeamTab').style.display = 'none';
+            document.getElementById('adminEmployeesTab').style.display = 'none';
+            document.getElementById('adminSettingsTab').style.display = 'none';
             
             // 버튼 스타일 리셋
-            document.getElementById('adminTab1').style.background = '#e5e7eb';
-            document.getElementById('adminTab1').style.color = '#374151';
-            document.getElementById('adminTab2').style.background = '#e5e7eb';
-            document.getElementById('adminTab2').style.color = '#374151';
-            document.getElementById('adminTab3').style.background = '#e5e7eb';
-            document.getElementById('adminTab3').style.color = '#374151';
+            ['adminTab1', 'adminTab2', 'adminTab3', 'adminTab4'].forEach(id => {
+                document.getElementById(id).style.background = '#e5e7eb';
+                document.getElementById(id).style.color = '#374151';
+            });
             
             // 선택된 탭 보이기
             if (tab === 'status') {
@@ -1590,10 +1632,16 @@
                 document.getElementById('adminTab2').style.background = '#4F46E5';
                 document.getElementById('adminTab2').style.color = 'white';
                 loadAdminHours('week');
-            } else if (tab === 'team') {
-                document.getElementById('adminTeamTab').style.display = 'block';
+            } else if (tab === 'employees') {
+                document.getElementById('adminEmployeesTab').style.display = 'block';
                 document.getElementById('adminTab3').style.background = '#4F46E5';
                 document.getElementById('adminTab3').style.color = 'white';
+                loadEmployeesList();
+            } else if (tab === 'settings') {
+                document.getElementById('adminSettingsTab').style.display = 'block';
+                document.getElementById('adminTab4').style.background = '#4F46E5';
+                document.getElementById('adminTab4').style.color = 'white';
+                loadSettings();
                 loadAdminTeams();
             }
         }
@@ -1631,6 +1679,132 @@
                 }).join('');
             } catch (e) {
                 console.error('근무시간 로드 실패:', e);
+            }
+        }
+        
+        // ==================== 직원 관리 함수 ====================
+        async function loadEmployeesList() {
+            try {
+                const employees = await fetch(`${API_BASE}/api/admin/employees`).then(r => r.json());
+                
+                document.getElementById('employeesList').innerHTML = employees.map(emp => {
+                    const isAdmin = emp.role === 'admin';
+                    const roleBtn = isAdmin 
+                        ? `<button onclick="changeRole(${emp.id}, 'member')" style="background:#EF4444; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">관리자 해제</button>`
+                        : `<button onclick="changeRole(${emp.id}, 'admin')" style="background:#4F46E5; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">관리자 지정</button>`;
+                    
+                    return `<div class="member-card" style="cursor:pointer;" onclick="openEmployeeDetail(${emp.id}, '${emp.name}')">
+                        <div class="member-avatar" style="background:${isAdmin ? '#4F46E5' : '#10B981'};">${emp.name.charAt(0)}</div>
+                        <div class="member-info" style="flex:1;">
+                            <div class="member-name">
+                                ${emp.name} 
+                                ${isAdmin ? '<span style="background:#4F46E5; color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px;">관리자</span>' : ''}
+                            </div>
+                            <div style="font-size:12px; color:#9ca3af;">${emp.email} | ${emp.team_name || '팀 없음'}</div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px;" onclick="event.stopPropagation();">
+                            ${roleBtn}
+                            <button onclick="resetPassword(${emp.id}, '${emp.name}')" style="background:#F59E0B; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">비밀번호 초기화</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                console.error('직원 목록 로드 실패:', e);
+            }
+        }
+        
+        async function resetPassword(userId, userName) {
+            if (!confirm(`${userName}님의 비밀번호를 123456으로 초기화할까요?`)) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/admin/reset-password/${userId}`, { method: 'PUT' });
+                const data = await res.json();
+                showToast(data.message || '비밀번호가 초기화되었습니다!');
+            } catch (e) {
+                showToast('초기화 실패');
+            }
+        }
+        
+        let currentDetailUserId = null;
+        
+        function openEmployeeDetail(userId, userName) {
+            currentDetailUserId = userId;
+            document.getElementById('employeeDetailName').textContent = userName;
+            document.getElementById('employeeDetailDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('employeeDetailModal').classList.add('show');
+            loadEmployeeDetail();
+        }
+        
+        function closeEmployeeDetailModal() {
+            document.getElementById('employeeDetailModal').classList.remove('show');
+        }
+        
+        async function loadEmployeeDetail() {
+            if (!currentDetailUserId) return;
+            
+            const date = document.getElementById('employeeDetailDate').value;
+            
+            try {
+                const data = await fetch(`${API_BASE}/api/admin/attendance-detail/${currentDetailUserId}?date=${date}`).then(r => r.json());
+                
+                if (data.sessions.length === 0) {
+                    document.getElementById('employeeDetailContent').innerHTML = '<div style="text-align:center; color:#9ca3af; padding:20px;">출퇴근 기록이 없습니다</div>';
+                    return;
+                }
+                
+                document.getElementById('employeeDetailContent').innerHTML = `
+                    <div style="margin-bottom:10px; font-weight:600;">📅 ${date} 출퇴근 내역</div>
+                    ${data.sessions.map((s, idx) => `
+                        <div style="display:flex; justify-content:space-between; padding:10px; background:#f9fafb; border-radius:8px; margin-bottom:8px;">
+                            <div>
+                                <span style="color:#10B981; font-weight:600;">${s.clock_in || '-'}</span>
+                                <span style="margin:0 10px;">→</span>
+                                <span style="color:#EF4444; font-weight:600;">${s.clock_out || '근무중'}</span>
+                            </div>
+                            <div style="color:#6b7280;">${s.work_minutes ? Math.floor(s.work_minutes/60) + '시간 ' + (s.work_minutes%60) + '분' : '-'}</div>
+                        </div>
+                    `).join('')}
+                    <div style="text-align:right; font-weight:600; color:#4F46E5; margin-top:10px;">
+                        총 ${Math.floor(data.total_minutes/60)}시간 ${data.total_minutes%60}분
+                    </div>
+                `;
+            } catch (e) {
+                console.error('상세 내역 로드 실패:', e);
+            }
+        }
+        
+        // ==================== 설정 함수 ====================
+        async function loadSettings() {
+            try {
+                const settings = await fetch(`${API_BASE}/api/settings`).then(r => r.json());
+                document.getElementById('settingLatitude').value = settings.latitude;
+                document.getElementById('settingLongitude').value = settings.longitude;
+                document.getElementById('settingRadius').value = settings.radius_meters;
+            } catch (e) {
+                console.error('설정 로드 실패:', e);
+            }
+        }
+        
+        async function saveSettings() {
+            const latitude = parseFloat(document.getElementById('settingLatitude').value);
+            const longitude = parseFloat(document.getElementById('settingLongitude').value);
+            const radius_meters = parseInt(document.getElementById('settingRadius').value);
+            
+            if (isNaN(latitude) || isNaN(longitude) || isNaN(radius_meters)) {
+                showToast('올바른 값을 입력하세요');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ latitude, longitude, radius_meters })
+                });
+                const data = await res.json();
+                showToast(data.message || '설정이 저장되었습니다!');
+            } catch (e) {
+                showToast('저장 실패');
             }
         }
         
