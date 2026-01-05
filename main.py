@@ -5,10 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import sqlite3
-from datetime import datetime, date as date_module, timedelta
+from datetime import datetime, date as date_module, timedelta, timezone
 import hashlib
 import math
 import os
+
+# 한국 시간대
+KST = timezone(timedelta(hours=9))
+
+def get_kst_now():
+    return datetime.now(KST)
+
+def get_kst_today():
+    return datetime.now(KST).date()
 
 app = FastAPI(title="출근하자")
 
@@ -22,100 +31,179 @@ app.add_middleware(
 
 # ==================== 회사 설정 ====================
 COMPANY_SETTINGS = {
-    "latitude": 35.84706729510516,      # 회사 위도 (예: 광주)
+    "latitude": 35.84706729510516,      # 회사 위도
     "longitude": 127.14263183020292,    # 회사 경도
-    "radius_meters": 2000,    # 출근 허용 반경 (2km) - 테스트 후 조정하세요
+    "radius_meters": 200,     # 출근 허용 반경
     "weekly_hours": 40,
     "default_in": "08:00",
     "default_out": "17:00"
 }
 
 # ==================== 데이터베이스 ====================
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
 def get_db():
-    conn = sqlite3.connect('flextime.db', check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if DATABASE_URL:
+        # PostgreSQL (Render)
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        # Render는 postgres:// 대신 postgresql://를 사용
+        db_url = DATABASE_URL.replace("postgres://", "postgresql://")
+        conn = psycopg2.connect(db_url, cursor_factory=RealDictCursor)
+        return conn
+    else:
+        # SQLite (로컬)
+        conn = sqlite3.connect('flextime.db', check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+def get_placeholder():
+    """PostgreSQL은 %s, SQLite는 ?"""
+    return "%s" if DATABASE_URL else "?"
 
 def init_db():
     conn = get_db()
     c = conn.cursor()
+    ph = get_placeholder()
     
-    c.execute('''CREATE TABLE IF NOT EXISTS team (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE
-    )''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS user (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        team_id INTEGER,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT DEFAULT 'member',
-        annual_leave_total REAL DEFAULT 15,
-        annual_leave_used REAL DEFAULT 0,
-        FOREIGN KEY (team_id) REFERENCES team(id)
-    )''')
-    
-    # 기존 attendance 테이블이 UNIQUE 제약이 있으면 새로 만들기
-    c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='attendance'")
-    result = c.fetchone()
-    
-    if result and 'UNIQUE' in (result[0] or ''):
-        # 기존 데이터 백업
-        c.execute("ALTER TABLE attendance RENAME TO attendance_old")
-        c.execute('''CREATE TABLE attendance (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+    if DATABASE_URL:
+        # PostgreSQL
+        c.execute('''CREATE TABLE IF NOT EXISTS team (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS "user" (
+            id SERIAL PRIMARY KEY,
+            team_id INTEGER,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'member',
+            annual_leave_total REAL DEFAULT 15,
+            annual_leave_used REAL DEFAULT 0
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS attendance (
+            id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             date TEXT NOT NULL,
             clock_in TEXT,
             clock_out TEXT,
-            work_minutes INTEGER DEFAULT 0,
-            FOREIGN KEY (user_id) REFERENCES user(id)
+            work_minutes INTEGER DEFAULT 0
         )''')
-        c.execute("INSERT INTO attendance SELECT * FROM attendance_old")
-        c.execute("DROP TABLE attendance_old")
-    elif not result:
-        c.execute('''CREATE TABLE attendance (
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS schedule (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            planned_in TEXT DEFAULT '08:00',
+            planned_out TEXT DEFAULT '17:00',
+            UNIQUE(user_id, date)
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS leave (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            type TEXT NOT NULL,
+            UNIQUE(user_id, date)
+        )''')
+    else:
+        # SQLite
+        c.execute('''CREATE TABLE IF NOT EXISTS team (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS user (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_id INTEGER,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'member',
+            annual_leave_total REAL DEFAULT 15,
+            annual_leave_used REAL DEFAULT 0,
+            FOREIGN KEY (team_id) REFERENCES team(id)
+        )''')
+        
+        # 기존 attendance 테이블이 UNIQUE 제약이 있으면 새로 만들기
+        c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='attendance'")
+        result = c.fetchone()
+        
+        if result and 'UNIQUE' in (result[0] or ''):
+            c.execute("ALTER TABLE attendance RENAME TO attendance_old")
+            c.execute('''CREATE TABLE attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                clock_in TEXT,
+                clock_out TEXT,
+                work_minutes INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES user(id)
+            )''')
+            c.execute("INSERT INTO attendance SELECT * FROM attendance_old")
+            c.execute("DROP TABLE attendance_old")
+        elif not result:
+            c.execute('''CREATE TABLE attendance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                clock_in TEXT,
+                clock_out TEXT,
+                work_minutes INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES user(id)
+            )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS schedule (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             date TEXT NOT NULL,
-            clock_in TEXT,
-            clock_out TEXT,
-            work_minutes INTEGER DEFAULT 0,
-            FOREIGN KEY (user_id) REFERENCES user(id)
+            planned_in TEXT DEFAULT '08:00',
+            planned_out TEXT DEFAULT '17:00',
+            FOREIGN KEY (user_id) REFERENCES user(id),
+            UNIQUE(user_id, date)
         )''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS schedule (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        planned_in TEXT DEFAULT '08:00',
-        planned_out TEXT DEFAULT '17:00',
-        FOREIGN KEY (user_id) REFERENCES user(id),
-        UNIQUE(user_id, date)
-    )''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS leave (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        type TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES user(id),
-        UNIQUE(user_id, date)
-    )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS leave (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            type TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES user(id),
+            UNIQUE(user_id, date)
+        )''')
     
     # 기본 팀 생성
-    c.execute("INSERT OR IGNORE INTO team (name) VALUES ('개발팀')")
-    c.execute("INSERT OR IGNORE INTO team (name) VALUES ('기획팀')")
-    c.execute("INSERT OR IGNORE INTO team (name) VALUES ('연구팀')")
+    try:
+        c.execute(f"INSERT INTO team (name) VALUES ({ph})", ('개발팀',))
+    except:
+        pass
+    try:
+        c.execute(f"INSERT INTO team (name) VALUES ({ph})", ('기획팀',))
+    except:
+        pass
+    try:
+        c.execute(f"INSERT INTO team (name) VALUES ({ph})", ('연구팀',))
+    except:
+        pass
     
     # 기본 관리자 계정 생성
     admin_password = hashlib.sha256("123456".encode()).hexdigest()
-    c.execute("""
-        INSERT OR IGNORE INTO user (name, email, password, team_id, role) 
-        VALUES ('관리자', 'admin@jbuh.kr', ?, 1, 'admin')
-    """, (admin_password,))
+    try:
+        if DATABASE_URL:
+            c.execute(f'''
+                INSERT INTO "user" (name, email, password, team_id, role) 
+                VALUES ({ph}, {ph}, {ph}, 1, 'admin')
+            ''', ('관리자', 'admin@jbuh.kr', admin_password))
+        else:
+            c.execute(f'''
+                INSERT OR IGNORE INTO user (name, email, password, team_id, role) 
+                VALUES ({ph}, {ph}, {ph}, 1, 'admin')
+            ''', ('관리자', 'admin@jbuh.kr', admin_password))
+    except:
+        pass
     
     conn.commit()
     return conn
@@ -182,7 +270,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 def get_week_dates(target_date=None):
     """해당 주의 월~금 날짜 리스트 반환"""
     if target_date is None:
-        target_date = date_module.today()
+        target_date = get_kst_today()
     
     # 월요일 찾기
     monday = target_date - timedelta(days=target_date.weekday())
@@ -296,8 +384,8 @@ def clock_in(data: ClockIn):
     
     conn = get_db()
     c = conn.cursor()
-    today = date_module.today().isoformat()
-    now = datetime.now().strftime("%H:%M")
+    today = get_kst_today().isoformat()
+    now = get_kst_now().strftime("%H:%M")
     
     # 오늘 아직 퇴근 안 한 기록이 있는지 확인
     c.execute(
@@ -321,8 +409,8 @@ def clock_in(data: ClockIn):
 def clock_out(data: ClockOut):
     conn = get_db()
     c = conn.cursor()
-    today = date_module.today().isoformat()
-    now = datetime.now().strftime("%H:%M")
+    today = get_kst_today().isoformat()
+    now = get_kst_now().strftime("%H:%M")
     
     # 오늘 퇴근 안 한 가장 최근 출근 기록 찾기
     c.execute(
@@ -359,7 +447,7 @@ def get_today_attendance(user_id: int):
     try:
         conn = get_db()
         c = conn.cursor()
-        today = date_module.today().isoformat()
+        today = get_kst_today().isoformat()
         
         # 오늘의 모든 출퇴근 기록 가져오기
         c.execute(
@@ -401,7 +489,7 @@ def get_today_attendance(user_id: int):
         if current_session:
             try:
                 clock_in_time = datetime.strptime(current_session["clock_in"], "%H:%M")
-                now = datetime.now()
+                now = get_kst_now()
                 current_time = datetime.strptime(now.strftime("%H:%M"), "%H:%M")
                 current_minutes = int((current_time - clock_in_time).total_seconds() / 60)
                 result["current_minutes"] = current_minutes
@@ -429,7 +517,7 @@ def get_weekly_attendance(user_id: int):
     records = {row["date"]: row["total_minutes"] or 0 for row in c.fetchall()}
     
     # 오늘 현재 근무중인 세션 확인
-    today = date_module.today().isoformat()
+    today = get_kst_today().isoformat()
     c.execute(
         "SELECT clock_in FROM attendance WHERE user_id = ? AND date = ? AND clock_out IS NULL",
         (user_id, today)
@@ -452,7 +540,7 @@ def get_weekly_attendance(user_id: int):
         # 오늘이고 근무중이면 현재까지 시간 추가
         if d == today and working_session:
             clock_in_time = datetime.strptime(working_session["clock_in"], "%H:%M")
-            now_time = datetime.strptime(datetime.now().strftime("%H:%M"), "%H:%M")
+            now_time = datetime.strptime(get_kst_now().strftime("%H:%M"), "%H:%M")
             current_minutes = int((now_time - clock_in_time).total_seconds() / 60)
             minutes += current_minutes
         
@@ -559,7 +647,7 @@ def get_team_status(team_id: int, date: str = None):
     
     # 날짜 파라미터가 없으면 오늘
     if not date:
-        target_date = date_module.today().isoformat()
+        target_date = get_kst_today().isoformat()
     else:
         target_date = date
     
@@ -619,7 +707,7 @@ def get_all_status():
     """관리자용: 전체 직원 현황"""
     conn = get_db()
     c = conn.cursor()
-    today = date_module.today().isoformat()
+    today = get_kst_today().isoformat()
     
     c.execute("""
         SELECT u.id, u.name, u.role, t.name as team_name, 
@@ -658,7 +746,7 @@ def get_admin_hours(period: str = "week"):
     conn = get_db()
     c = conn.cursor()
     
-    today = date_module.today()
+    today = get_kst_today()
     
     if period == "week":
         # 이번 주 월~금
@@ -821,4 +909,5 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
