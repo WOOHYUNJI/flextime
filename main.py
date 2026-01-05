@@ -223,7 +223,10 @@ def init_db():
     
     # 기존 관리자 팀 NULL로 업데이트
     try:
-        db_execute(c, "UPDATE user SET team_id = NULL WHERE role = 'admin'")
+        if DATABASE_URL:
+            db_execute(c, 'UPDATE "user" SET team_id = NULL WHERE role = %s', ('admin',))
+        else:
+            db_execute(c, "UPDATE user SET team_id = NULL WHERE role = ?", ('admin',))
     except:
         pass
     
