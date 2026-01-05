@@ -205,19 +205,25 @@ def init_db():
     except:
         pass
     
-    # 기본 관리자 계정 생성
+    # 기본 관리자 계정 생성 (팀 없음)
     admin_password = hashlib.sha256("123456".encode()).hexdigest()
     try:
         if DATABASE_URL:
             db_execute(c, f'''
                 INSERT INTO "user" (name, email, password, team_id, role) 
-                VALUES ({ph}, {ph}, {ph}, 1, 'admin')
+                VALUES ({ph}, {ph}, {ph}, NULL, 'admin')
             ''', ('관리자', 'admin@jbuh.kr', admin_password))
         else:
             db_execute(c, f'''
                 INSERT OR IGNORE INTO user (name, email, password, team_id, role) 
-                VALUES ({ph}, {ph}, {ph}, 1, 'admin')
+                VALUES ({ph}, {ph}, {ph}, NULL, 'admin')
             ''', ('관리자', 'admin@jbuh.kr', admin_password))
+    except:
+        pass
+    
+    # 기존 관리자 팀 NULL로 업데이트
+    try:
+        db_execute(c, "UPDATE user SET team_id = NULL WHERE role = 'admin'")
     except:
         pass
     
@@ -720,38 +726,50 @@ def get_team_status(team_id: int, date: str = None):
 
 @app.get("/api/admin/all-status")
 def get_all_status():
-    """관리자용: 전체 직원 현황"""
+    """관리자용: 전체 직원 현황 (관리자 제외, 최종 출퇴근만)"""
     conn = get_db()
     c = conn.cursor()
     today = get_kst_today().isoformat()
     
+    # 관리자 제외한 직원만 조회
     db_execute(c, """
-        SELECT u.id, u.name, u.role, t.name as team_name, 
-               a.clock_in, a.clock_out, a.work_minutes,
-               l.type as leave_type
+        SELECT u.id, u.name, u.role, t.name as team_name
         FROM user u
         LEFT JOIN team t ON u.team_id = t.id
-        LEFT JOIN attendance a ON u.id = a.user_id AND a.date = ?
-        LEFT JOIN leave l ON u.id = l.user_id AND l.date = ?
-    """, (today, today))
+        WHERE u.role != 'admin'
+    """)
+    users = c.fetchall()
     
     result = []
-    for row in c.fetchall():
+    for user in users:
+        # 최종 출퇴근 기록만 가져오기
+        db_execute(c, """
+            SELECT clock_in, clock_out, work_minutes 
+            FROM attendance 
+            WHERE user_id = ? AND date = ? 
+            ORDER BY id DESC LIMIT 1
+        """, (user["id"], today))
+        att = c.fetchone()
+        
+        # 휴가 확인
+        db_execute(c, "SELECT type FROM leave WHERE user_id = ? AND date = ?", (user["id"], today))
+        leave = c.fetchone()
+        
         status = "미출근"
-        if row["leave_type"]:
-            status = {"annual": "연차", "half_am": "오전반차", "half_pm": "오후반차"}.get(row["leave_type"], "휴가")
-        elif row["clock_in"]:
-            status = "퇴근" if row["clock_out"] else "근무중"
+        if leave:
+            status = {"annual": "연차", "half_am": "오전반차", "half_pm": "오후반차"}.get(leave["type"], "휴가")
+        elif att and att["clock_in"]:
+            status = "퇴근" if att["clock_out"] else "근무중"
         
         result.append({
-            "id": row["id"],
-            "name": row["name"],
-            "role": row["role"],
-            "team": row["team_name"],
+            "id": user["id"],
+            "name": user["name"],
+            "role": user["role"],
+            "team": user["team_name"],
             "status": status,
-            "clock_in": row["clock_in"],
-            "clock_out": row["clock_out"],
-            "work_minutes": row["work_minutes"] or 0
+            "clock_in": att["clock_in"] if att else None,
+            "clock_out": att["clock_out"] if att else None,
+            "work_minutes": att["work_minutes"] if att else 0
         })
     
     return result
@@ -917,6 +935,76 @@ def update_user_role(data: RoleUpdate):
 @app.get("/api/settings")
 def get_settings():
     return COMPANY_SETTINGS
+
+class SettingsUpdate(BaseModel):
+    latitude: float
+    longitude: float
+    radius_meters: int
+
+@app.put("/api/settings")
+def update_settings(data: SettingsUpdate):
+    """회사 설정 업데이트"""
+    global COMPANY_SETTINGS
+    COMPANY_SETTINGS["latitude"] = data.latitude
+    COMPANY_SETTINGS["longitude"] = data.longitude
+    COMPANY_SETTINGS["radius_meters"] = data.radius_meters
+    return {"success": True, "message": "설정이 저장되었습니다!"}
+
+# --- 직원 관리 API ---
+@app.get("/api/admin/employees")
+def get_all_employees():
+    """전체 직원 목록 (관리자 포함)"""
+    conn = get_db()
+    c = conn.cursor()
+    db_execute(c, """
+        SELECT u.id, u.name, u.email, u.role, u.team_id, t.name as team_name,
+               u.annual_leave_total, u.annual_leave_used
+        FROM user u
+        LEFT JOIN team t ON u.team_id = t.id
+        ORDER BY u.role DESC, u.name
+    """)
+    return [dict(row) for row in c.fetchall()]
+
+@app.put("/api/admin/reset-password/{user_id}")
+def reset_password(user_id: int):
+    """비밀번호 초기화 (123456)"""
+    conn = get_db()
+    c = conn.cursor()
+    new_password = hash_password("123456")
+    db_execute(c, "UPDATE user SET password = ? WHERE id = ?", (new_password, user_id))
+    conn.commit()
+    return {"success": True, "message": "비밀번호가 123456으로 초기화되었습니다!"}
+
+@app.get("/api/admin/attendance-detail/{user_id}")
+def get_attendance_detail(user_id: int, date: str = None):
+    """직원 출퇴근 상세 내역 (날짜별)"""
+    conn = get_db()
+    c = conn.cursor()
+    target_date = date or get_kst_today().isoformat()
+    
+    # 해당 날짜의 모든 출퇴근 기록
+    db_execute(c, """
+        SELECT id, clock_in, clock_out, work_minutes 
+        FROM attendance 
+        WHERE user_id = ? AND date = ?
+        ORDER BY id
+    """, (user_id, target_date))
+    sessions = [dict(row) for row in c.fetchall()]
+    
+    # 사용자 정보
+    db_execute(c, "SELECT name FROM user WHERE id = ?", (user_id,))
+    user = c.fetchone()
+    
+    # 총 근무 시간
+    total_minutes = sum(s.get("work_minutes") or 0 for s in sessions)
+    
+    return {
+        "user_id": user_id,
+        "user_name": user["name"] if user else "",
+        "date": target_date,
+        "sessions": sessions,
+        "total_minutes": total_minutes
+    }
 
 # ==================== 메인 페이지 ====================
 @app.get("/", response_class=HTMLResponse)
