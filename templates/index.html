@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>출근하자</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4F46E5">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: #f3f4f6;
+            min-height: 100vh;
+            padding-bottom: 70px;
+        }
+        
+        /* 헤더 */
+        .header {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header .greeting {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        /* 컨테이너 */
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+        
+        /* 카드 */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .card-title {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+        
+        /* 오늘 현황 카드 */
+        .today-card {
+            text-align: center;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .status-badge.working {
+            background: #DEF7EC;
+            color: #03543F;
+        }
+        
+        .status-badge.not-working {
+            background: #FDE8E8;
+            color: #9B1C1C;
+        }
+        
+        .status-badge.done {
+            background: #E1EFFE;
+            color: #1E40AF;
+        }
+        
+        .time-display {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 10px 0;
+        }
+        
+        .time-detail {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        /* 출퇴근 버튼 */
+        .clock-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-clock-in {
+            background: #10B981;
+            color: white;
+        }
+        
+        .btn-clock-in:disabled {
+            background: #d1d5db;
+            color: #9ca3af;
+        }
+        
+        .btn-clock-out {
+            background: #EF4444;
+            color: white;
+        }
+        
+        .btn-clock-out:disabled {
+            background: #d1d5db;
+            color: #9ca3af;
+        }
+        
+        /* 주간 진행률 */
+        .progress-container {
+            margin-top: 15px;
+        }
+        
+        .progress-bar {
+            height: 12px;
+            background: #e5e7eb;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4F46E5, #7C3AED);
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        /* 일별 현황 */
+        .daily-list {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        
+        .daily-item {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .daily-day {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-bottom: 5px;
+        }
+        
+        .daily-hours {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .daily-hours.today {
+            color: #4F46E5;
+        }
+        
+        .daily-hours.leave {
+            color: #F59E0B;
+        }
+        
+        /* 하단 네비게이션 */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            color: #9ca3af;
+            cursor: pointer;
+            padding: 5px 15px;
+        }
+        
+        .nav-item.active {
+            color: #4F46E5;
+        }
+        
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 3px;
+        }
+        
+        /* 페이지들 */
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        /* 팀 현황 */
+        .member-card {
+            display: flex;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .member-card:last-child {
+            border-bottom: none;
+        }
+        
+        .member-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 18px;
+        }
+        
+        .member-info {
+            flex: 1;
+        }
+        
+        .member-name {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .member-schedule {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        
+        .member-status {
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .member-status.working {
+            background: #DEF7EC;
+            color: #03543F;
+        }
+        
+        .member-status.not-working {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .member-status.done {
+            background: #E1EFFE;
+            color: #1E40AF;
+        }
+        
+        .member-status.leave {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+        
+        /* 일정 */
+        .schedule-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .schedule-day {
+            width: 50px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .schedule-time {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .schedule-time input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        /* 휴가 */
+        .leave-form {
+            margin-bottom: 20px;
+        }
+        
+        .leave-type-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .leave-type-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .leave-type-btn.selected {
+            border-color: #4F46E5;
+            background: #EEF2FF;
+            color: #4F46E5;
+        }
+        
+        .leave-balance {
+            background: #F3F4F6;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .leave-balance-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #4F46E5;
+        }
+        
+        /* 로그인 */
+        .login-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+        }
+        
+        .login-box {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 350px;
+        }
+        
+        .login-title {
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        
+        .login-subtitle {
+            text-align: center;
+            color: #6b7280;
+            margin-bottom: 25px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            font-size: 14px;
+            color: #374151;
+            margin-bottom: 5px;
+        }
+        
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: #4F46E5;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .login-toggle {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .login-toggle a {
+            color: #4F46E5;
+            cursor: pointer;
+        }
+        
+        /* 토스트 메시지 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1f2937;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .toast.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        
+        /* 수정 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            width: 90%;
+            max-width: 350px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons .btn {
+            background: #4F46E5;
+            color: white;
+        }
+        
+        .modal-buttons .btn-cancel {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        
+        /* 위치 상태 */
+        .location-status {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .location-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9ca3af;
+        }
+        
+        .location-dot.ok {
+            background: #10B981;
+        }
+        
+        .location-dot.far {
+            background: #EF4444;
+        }
+    </style>
+</head>
+<body>
+    <!-- 토스트 -->
+    <div id="toast" class="toast"></div>
+    
+    <!-- 로그인 페이지 -->
+    <div id="loginPage" class="login-page">
+        <div class="login-box">
+            <h1 class="login-title">⏰ 출근하자</h1>
+            
+            <div id="loginForm">
+                <div class="input-group">
+                    <label>이메일</label>
+                    <input type="email" id="loginEmail" placeholder="email@company.com">
+                </div>
+                <div class="input-group">
+                    <label>비밀번호</label>
+                    <input type="password" id="loginPassword" placeholder="비밀번호">
+                </div>
+                <button class="btn-login" onclick="login()">로그인</button>
+                <p class="login-toggle">계정이 없으신가요? <a onclick="showRegister()">회원가입</a></p>
+            </div>
+            
+            <div id="registerForm" style="display:none;">
+                <div class="input-group">
+                    <label>이름</label>
+                    <input type="text" id="regName" placeholder="홍길동">
+                </div>
+                <div class="input-group">
+                    <label>이메일</label>
+                    <input type="email" id="regEmail" placeholder="email@company.com">
+                </div>
+                <div class="input-group">
+                    <label>비밀번호</label>
+                    <input type="password" id="regPassword" placeholder="비밀번호">
+                </div>
+                <div class="input-group">
+                    <label>팀</label>
+                    <select id="regTeam"></select>
+                </div>
+                <button class="btn-login" onclick="register()">회원가입</button>
+                <p class="login-toggle">이미 계정이 있으신가요? <a onclick="showLogin()">로그인</a></p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 메인 앱 -->
+    <div id="mainApp" style="display:none;">
+        <div class="header">
+            <h1>⏰ 출근하자</h1>
+            <p class="greeting" id="greetingText">안녕하세요!</p>
+        </div>
+        
+        <!-- 홈 페이지 -->
+        <div id="homePage" class="page active">
+            <div class="container">
+                <div class="card today-card">
+                    <div class="card-title">📅 오늘 <span id="todayDate"></span></div>
+                    <div id="todayStatus" class="status-badge not-working">미출근</div>
+                    <div class="time-display" id="workTime">0시간 0분</div>
+                    <div class="time-detail" id="clockTimes">-</div>
+                    
+                    <div class="location-status" id="locationStatus">
+                        <span class="location-dot" id="locationDot"></span>
+                        <span id="locationText">위치 확인 중...</span>
+                    </div>
+                    
+                    <div class="clock-buttons">
+                        <button id="btnClockIn" class="btn btn-clock-in" onclick="clockIn()">🟢 출근</button>
+                        <button id="btnClockOut" class="btn btn-clock-out" onclick="clockOut()" disabled>🔴 퇴근</button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">📊 이번 주 현황</div>
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="weeklyProgress" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text">
+                            <span id="weeklyHours">0시간</span>
+                            <span>목표: 40시간</span>
+                        </div>
+                    </div>
+                    <div class="daily-list" id="dailyList"></div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <!-- 일정 페이지 -->
+        <div id="schedulePage" class="page">
+            <div class="container">
+                <div class="card">
+                    <div class="card-title">📅 이번 주 출퇴근 예정</div>
+                    <div id="scheduleList"></div>
+                    <button class="btn" style="background:#4F46E5; color:white; width:100%; margin-top:15px;" onclick="saveSchedule()">저장</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 팀 페이지 -->
+        <div id="teamPage" class="page">
+            <div class="container">
+                <div class="card">
+                    <div class="card-title">👥 우리 팀 현황</div>
+                    <p style="font-size:12px; color:#9ca3af; margin-bottom:15px;">팀원을 터치하면 이번 주 일정을 볼 수 있어요</p>
+                    <div id="teamList"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 팀원 일정 모달 -->
+        <div id="memberScheduleModal" class="modal">
+            <div class="modal-content" style="max-width:400px;">
+                <div class="modal-title" id="memberScheduleTitle">📅 이번 주 일정</div>
+                <div id="memberScheduleContent"></div>
+                <div class="modal-buttons">
+                    <button class="btn" style="width:100%;" onclick="closeMemberSchedule()">닫기</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 휴가 페이지 -->
+        <div id="leavePage" class="page">
+            <div class="container">
+                <div class="card">
+                    <div class="leave-balance">
+                        <div style="font-size:14px; color:#6b7280;">잔여 연차</div>
+                        <div class="leave-balance-number" id="leaveBalance">0일</div>
+                        <div style="font-size:12px; color:#9ca3af;" id="leaveUsed">사용: 0일 / 총: 15일</div>
+                    </div>
+                    
+                    <div class="card-title">🏖️ 휴가 등록</div>
+                    <div class="leave-form">
+                        <div class="leave-type-buttons">
+                            <div class="leave-type-btn selected" onclick="selectLeaveType(this, 'annual')">연차<br><small>1일</small></div>
+                            <div class="leave-type-btn" onclick="selectLeaveType(this, 'half_am')">오전반차<br><small>0.5일</small></div>
+                            <div class="leave-type-btn" onclick="selectLeaveType(this, 'half_pm')">오후반차<br><small>0.5일</small></div>
+                        </div>
+                        <div class="input-group">
+                            <label>날짜</label>
+                            <input type="date" id="leaveDate">
+                        </div>
+                        <button class="btn" style="background:#4F46E5; color:white; width:100%;" onclick="submitLeave()">휴가 등록</button>
+                    </div>
+                    
+                    <div class="card-title" style="margin-top:20px;">📋 휴가 내역</div>
+                    <div id="leaveList"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">⚙️ 연차 설정</div>
+                    <div class="input-group">
+                        <label>총 연차 일수</label>
+                        <input type="number" id="totalAnnualLeave" step="0.5" min="0">
+                    </div>
+                    <button class="btn" style="background:#6b7280; color:white; width:100%;" onclick="updateAnnualLeave()">저장</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 관리자 페이지 -->
+        <div id="adminPage" class="page">
+            <div class="container">
+                <!-- 탭 메뉴 -->
+                <div style="display:flex; gap:5px; margin-bottom:15px; background:white; border-radius:12px; padding:5px;">
+                    <button id="adminTab1" class="btn" style="flex:1; background:#4F46E5; color:white; padding:10px;" onclick="showAdminTab('status')">출퇴근 현황</button>
+                    <button id="adminTab2" class="btn" style="flex:1; background:#e5e7eb; color:#374151; padding:10px;" onclick="showAdminTab('hours')">근무시간</button>
+                    <button id="adminTab3" class="btn" style="flex:1; background:#e5e7eb; color:#374151; padding:10px;" onclick="showAdminTab('team')">팀 관리</button>
+                </div>
+                
+                <!-- 출퇴근 현황 탭 -->
+                <div id="adminStatusTab" class="card">
+                    <div class="card-title">👑 오늘 전체 직원 현황</div>
+                    <div id="adminList"></div>
+                </div>
+                
+                <!-- 근무시간 탭 -->
+                <div id="adminHoursTab" class="card" style="display:none;">
+                    <div class="card-title">📊 직원별 근무시간</div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <button id="hoursWeekBtn" class="btn" style="flex:1; background:#4F46E5; color:white;" onclick="loadAdminHours('week')">주간</button>
+                        <button id="hoursMonthBtn" class="btn" style="flex:1; background:#e5e7eb; color:#374151;" onclick="loadAdminHours('month')">월간</button>
+                    </div>
+                    <div id="adminHoursList"></div>
+                </div>
+                
+                <!-- 팀 관리 탭 -->
+                <div id="adminTeamTab" class="card" style="display:none;">
+                    <div class="card-title">🏢 팀 관리</div>
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="newTeamName" placeholder="새 팀 이름" style="flex:1; padding:10px; border:1px solid #e5e7eb; border-radius:8px;">
+                        <button class="btn" style="background:#4F46E5; color:white; padding:10px 20px;" onclick="createTeam()">추가</button>
+                    </div>
+                    <div id="adminTeamList"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 하단 네비게이션 -->
+        <div class="bottom-nav">
+            <div class="nav-item active" onclick="showPage('home')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                홈
+            </div>
+            <div class="nav-item" onclick="showPage('schedule')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                일정
+            </div>
+            <div class="nav-item" onclick="showPage('team')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                팀
+            </div>
+            <div class="nav-item" onclick="showPage('leave')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+                휴가
+            </div>
+            <div class="nav-item" id="adminNav" style="display:none;" onclick="showPage('admin')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                관리
+            </div>
+        </div>
+    </div>
+    
+    <!-- 수정 모달 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">✏️ 출퇴근 기록 수정</div>
+            <div class="input-group">
+                <label>날짜</label>
+                <input type="date" id="editDate">
+            </div>
+            <div class="input-group">
+                <label>출근 시간</label>
+                <input type="time" id="editClockIn">
+            </div>
+            <div class="input-group">
+                <label>퇴근 시간</label>
+                <input type="time" id="editClockOut">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeEditModal()">취소</button>
+                <button class="btn" onclick="saveEdit()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 전역 변수 ====================
+        let currentUser = null;
+        let currentLocation = null;
+        let selectedLeaveType = 'annual';
+        const API_BASE = '';
+        
+        // ==================== 초기화 ====================
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 저장된 사용자 확인
+            const saved = localStorage.getItem('flextime_user');
+            if (saved) {
+                currentUser = JSON.parse(saved);
+                showMainApp();
+            }
+            
+            // 팀 목록 로드
+            await loadTeams();
+            
+            // 오늘 날짜 설정
+            const today = new Date();
+            document.getElementById('todayDate').textContent = 
+                `${today.getMonth()+1}월 ${today.getDate()}일 (${['일','월','화','수','목','금','토'][today.getDay()]})`;
+            
+            // 휴가 날짜 기본값
+            document.getElementById('leaveDate').valueAsDate = today;
+            document.getElementById('editDate').valueAsDate = today;
+            
+            // 위치 추적 시작
+            startLocationTracking();
+        });
+        
+        // ==================== 위치 ====================
+        let clockInTime = null;  // 출근 시간
+        let outsideStartTime = null;  // 회사 밖으로 나간 시간
+        let insideStartTime = null;  // 회사 안에 들어온 시간 (출근 안 누른 상태)
+        let alarmShown = false;  // 알람 중복 방지
+        
+        function startLocationTracking() {
+            if (!navigator.geolocation) {
+                document.getElementById('locationText').textContent = '위치 기능 미지원';
+                return;
+            }
+            
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    currentLocation = {
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude
+                    };
+                    checkLocationStatus();
+                },
+                (err) => {
+                    document.getElementById('locationText').textContent = '위치 권한을 허용해주세요';
+                    document.getElementById('locationDot').className = 'location-dot far';
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+            );
+        }
+        
+        async function checkLocationStatus() {
+            const settings = await fetch(`${API_BASE}/api/settings`).then(r => r.json());
+            const distance = calculateDistance(
+                currentLocation.latitude, currentLocation.longitude,
+                settings.latitude, settings.longitude
+            );
+            
+            const isNearby = distance <= settings.radius_meters;
+            const isTooFar = distance > 1000; // 1km 이상 멀어지면
+            
+            document.getElementById('locationDot').className = `location-dot ${isNearby ? 'ok' : 'far'}`;
+            document.getElementById('locationText').textContent = isNearby 
+                ? `회사 근처 (${Math.round(distance)}m)` 
+                : `회사에서 ${Math.round(distance)}m 떨어짐`;
+            
+            const btnIn = document.getElementById('btnClockIn');
+            const btnOut = document.getElementById('btnClockOut');
+            const isWorking = !btnOut.disabled;  // 퇴근 버튼 활성화 = 근무중
+            
+            // === 근무중일 때 ===
+            if (isWorking) {
+                if (!isNearby) {
+                    // 회사 밖으로 나감
+                    if (!outsideStartTime) {
+                        outsideStartTime = new Date();
+                    }
+                    
+                    // 출근 후 1시간 30분 경과했는지 확인
+                    const now = new Date();
+                    const clockInElapsed = clockInTime ? (now - clockInTime) / 1000 / 60 : 0;  // 분
+                    const outsideElapsed = (now - outsideStartTime) / 1000 / 60;  // 분
+                    
+                    if (clockInElapsed >= 90) {
+                        // 1시간 30분 이후 → 10분 이상 밖에 있으면 자동 퇴근
+                        if (outsideElapsed >= 10) {
+                            await autoClockOut();
+                            outsideStartTime = null;
+                        }
+                    }
+                    
+                    // 1km 이상이면 즉시 자동 퇴근
+                    if (isTooFar) {
+                        await autoClockOut();
+                        outsideStartTime = null;
+                    }
+                } else {
+                    // 회사 안에 있음 → 카운트 리셋
+                    outsideStartTime = null;
+                }
+            } 
+            // === 근무중 아닐 때 ===
+            else {
+                // 출근 버튼 활성화/비활성화
+                btnIn.disabled = !isNearby;
+                
+                if (isNearby) {
+                    // 회사 안에 있는데 출근 안 누름
+                    if (!insideStartTime) {
+                        insideStartTime = new Date();
+                        alarmShown = false;
+                    }
+                    
+                    const now = new Date();
+                    const insideElapsed = (now - insideStartTime) / 1000 / 60;  // 분
+                    
+                    // 10분 이상 회사에 있는데 출근 안 누름 → 알림
+                    if (insideElapsed >= 10 && !alarmShown) {
+                        showClockInReminder();
+                        alarmShown = true;
+                    }
+                } else {
+                    // 회사 밖 → 카운트 리셋
+                    insideStartTime = null;
+                    alarmShown = false;
+                }
+            }
+        }
+        
+        function showClockInReminder() {
+            // 진동 (모바일)
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200, 100, 200]);
+            }
+            
+            // 알림창
+            showToast('⏰ 출근 버튼을 눌러주세요!');
+            
+            // 브라우저 알림 (권한 있으면)
+            if (Notification.permission === 'granted') {
+                new Notification('출근하자', {
+                    body: '회사에 10분 이상 계셨어요. 출근 버튼을 눌러주세요!',
+                    icon: '⏰'
+                });
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission();
+            }
+        }
+        
+        async function autoClockOut() {
+            try {
+                const res = await fetch(`${API_BASE}/api/attendance/clock-out`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id })
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    // 시간 기록 리셋
+                    clockInTime = null;
+                    outsideStartTime = null;
+                    
+                    showToast('📍 자동 퇴근 처리되었습니다!');
+                    await loadTodayAttendance();
+                    await loadWeeklyAttendance();
+                }
+            } catch (e) {
+                console.log('자동 퇴근 처리 실패:', e);
+            }
+        }
+        
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const phi1 = lat1 * Math.PI / 180;
+            const phi2 = lat2 * Math.PI / 180;
+            const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+            const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+            
+            const a = Math.sin(deltaPhi/2)**2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda/2)**2;
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c;
+        }
+        
+        // ==================== 인증 ====================
+        async function loadTeams() {
+            const teams = await fetch(`${API_BASE}/api/teams`).then(r => r.json());
+            const select = document.getElementById('regTeam');
+            select.innerHTML = teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+        }
+        
+        function showRegister() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+        }
+        
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+        }
+        
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail);
+                }
+                
+                const data = await res.json();
+                currentUser = data.user;
+                localStorage.setItem('flextime_user', JSON.stringify(currentUser));
+                showMainApp();
+                showToast('로그인 성공! 👋');
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        async function register() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const team_id = parseInt(document.getElementById('regTeam').value);
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password, team_id })
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail);
+                }
+                
+                showToast('회원가입 완료! 로그인해주세요');
+                showLogin();
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('flextime_user');
+            currentUser = null;
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('loginPage').style.display = 'flex';
+        }
+        
+        // ==================== 메인 앱 ====================
+        async function showMainApp() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('greetingText').textContent = `안녕하세요, ${currentUser.name}님! 👋`;
+            
+            // 관리자면 관리 탭만 보이기
+            if (currentUser.role === 'admin') {
+                document.getElementById('adminNav').style.display = 'flex';
+                // 다른 탭 숨기기
+                document.querySelectorAll('.nav-item').forEach(nav => {
+                    if (nav.id !== 'adminNav') {
+                        nav.style.display = 'none';
+                    }
+                });
+                // 관리 페이지로 바로 이동
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                document.getElementById('adminPage').classList.add('active');
+                document.getElementById('adminNav').classList.add('active');
+                await loadAdminData();
+            } else {
+                await loadTodayAttendance();
+                await loadWeeklyAttendance();
+                await loadSchedule();
+                await loadTeamStatus();
+                await loadLeaveInfo();
+            }
+        }
+        
+        // ==================== 출퇴근 ====================
+        async function loadTodayAttendance() {
+            try {
+                const res = await fetch(`${API_BASE}/api/attendance/today/${currentUser.id}`);
+                if (!res.ok) {
+                    console.error('API 오류:', res.status);
+                    return;
+                }
+                const data = await res.json();
+                
+                const statusEl = document.getElementById('todayStatus');
+                const timeEl = document.getElementById('workTime');
+                const detailEl = document.getElementById('clockTimes');
+                const btnIn = document.getElementById('btnClockIn');
+                const btnOut = document.getElementById('btnClockOut');
+                
+                // 총 근무시간 계산 (완료된 세션 + 현재 세션)
+                let totalMinutes = data.work_minutes || 0;
+                if (data.current_minutes) {
+                    totalMinutes += data.current_minutes;
+                }
+                
+                const hours = Math.floor(totalMinutes / 60);
+                const mins = totalMinutes % 60;
+                timeEl.textContent = `${hours}시간 ${mins}분`;
+                
+                if (data.is_working) {
+                    // 근무 중
+                    statusEl.textContent = '🟢 근무중';
+                    statusEl.className = 'status-badge working';
+                    btnIn.disabled = true;
+                    btnIn.dataset.clocked = 'true';
+                    btnOut.disabled = false;
+                    
+                    // 현재 세션의 출근 시간 찾기
+                    const currentSession = data.sessions ? data.sessions.find(s => !s.clock_out) : null;
+                    detailEl.textContent = currentSession ? `출근 ${currentSession.clock_in}` : `출근 ${data.clock_in}`;
+                    
+                    // 출근 시간 복원 (페이지 새로고침 대비)
+                    if (!clockInTime && currentSession) {
+                        const [h, m] = currentSession.clock_in.split(':');
+                        clockInTime = new Date();
+                        clockInTime.setHours(parseInt(h), parseInt(m), 0);
+                    }
+                    
+                    // 1분마다 업데이트
+                    setTimeout(loadTodayAttendance, 60000);
+                } else if (data.clock_in) {
+                    // 퇴근 완료 (다시 출근 가능!)
+                    statusEl.textContent = '퇴근';
+                    statusEl.className = 'status-badge done';
+                    btnIn.disabled = false;  // 다시 출근 가능!
+                    btnIn.dataset.clocked = '';
+                    btnOut.disabled = true;
+                    detailEl.textContent = data.sessions && data.sessions.length > 1 
+                        ? `${data.sessions.length}회 출퇴근` 
+                        : `${data.clock_in} ~ ${data.clock_out || ''}`;
+                    
+                    // 퇴근 상태면 리셋
+                    clockInTime = null;
+                    outsideStartTime = null;
+                } else {
+                    // 미출근
+                    statusEl.textContent = '미출근';
+                    statusEl.className = 'status-badge not-working';
+                    btnIn.disabled = false;
+                    btnIn.dataset.clocked = '';
+                    btnOut.disabled = true;
+                    detailEl.textContent = '-';
+                    
+                    clockInTime = null;
+                    outsideStartTime = null;
+                }
+            } catch (e) {
+                console.error('loadTodayAttendance 오류:', e);
+            }
+        }
+        
+        async function clockIn() {
+            if (!currentLocation) {
+                showToast('위치를 확인할 수 없어요. 위치 권한을 허용해주세요!');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/attendance/clock-in`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        latitude: currentLocation.latitude,
+                        longitude: currentLocation.longitude
+                    })
+                });
+                
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail);
+                
+                // 출근 시간 기록
+                clockInTime = new Date();
+                outsideStartTime = null;
+                insideStartTime = null;
+                alarmShown = false;
+                
+                showToast(data.message);
+                await loadTodayAttendance();
+                await loadWeeklyAttendance();
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        async function clockOut() {
+            try {
+                const res = await fetch(`${API_BASE}/api/attendance/clock-out`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id })
+                });
+                
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail);
+                
+                // 시간 기록 리셋
+                clockInTime = null;
+                outsideStartTime = null;
+                
+                showToast(data.message);
+                await loadTodayAttendance();
+                await loadWeeklyAttendance();
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        async function loadWeeklyAttendance() {
+            const data = await fetch(`${API_BASE}/api/attendance/weekly/${currentUser.id}`).then(r => r.json());
+            
+            document.getElementById('weeklyProgress').style.width = `${data.progress_percent}%`;
+            document.getElementById('weeklyHours').textContent = `${data.total_hours}시간 / ${data.target_hours}시간`;
+            
+            const days = ['월', '화', '수', '목', '금'];
+            const today = new Date().toISOString().split('T')[0];
+            
+            document.getElementById('dailyList').innerHTML = data.daily.map((d, i) => {
+                const hours = Math.round(d.minutes / 60 * 10) / 10;
+                const isToday = d.date === today;
+                let display = d.leave || `${hours}h`;
+                let cls = isToday ? 'today' : (d.leave ? 'leave' : '');
+                
+                return `<div class="daily-item">
+                    <div class="daily-day">${days[i]}</div>
+                    <div class="daily-hours ${cls}">${display}</div>
+                </div>`;
+            }).join('');
+        }
+        
+        // ==================== 일정 ====================
+        async function loadSchedule() {
+            const data = await fetch(`${API_BASE}/api/schedule/week/${currentUser.id}`).then(r => r.json());
+            const days = ['월', '화', '수', '목', '금'];
+            
+            document.getElementById('scheduleList').innerHTML = data.map((s, i) => `
+                <div class="schedule-item" data-date="${s.date}">
+                    <div class="schedule-day">${days[i]}</div>
+                    <div class="schedule-time">
+                        <input type="time" class="schedule-in" value="${s.planned_in}">
+                        <span>~</span>
+                        <input type="time" class="schedule-out" value="${s.planned_out}">
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function saveSchedule() {
+            const items = document.querySelectorAll('#scheduleList .schedule-item');
+            
+            for (const item of items) {
+                const date = item.dataset.date;
+                const planned_in = item.querySelector('.schedule-in').value;
+                const planned_out = item.querySelector('.schedule-out').value;
+                
+                await fetch(`${API_BASE}/api/schedule/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        date, planned_in, planned_out
+                    })
+                });
+            }
+            
+            showToast('일정이 저장되었습니다!');
+        }
+        
+        // ==================== 팀 현황 ====================
+        async function loadTeamStatus() {
+            const data = await fetch(`${API_BASE}/api/team/status/${currentUser.team_id}`).then(r => r.json());
+            
+            document.getElementById('teamList').innerHTML = data.map(m => {
+                let statusClass = 'not-working';
+                if (m.status === '근무중') statusClass = 'working';
+                else if (m.status === '퇴근') statusClass = 'done';
+                else if (m.status.includes('차') || m.status === '연차') statusClass = 'leave';
+                
+                const emoji = m.name.charAt(0);
+                const timeInfo = m.clock_in 
+                    ? (m.clock_out ? `${m.clock_in}~${m.clock_out}` : `${m.clock_in} 출근`)
+                    : `예정 ${m.planned_in}~${m.planned_out}`;
+                
+                return `<div class="member-card" onclick="showMemberSchedule(${m.id}, '${m.name}')" style="cursor:pointer;">
+                    <div class="member-avatar">${emoji}</div>
+                    <div class="member-info">
+                        <div class="member-name">${m.name}</div>
+                        <div class="member-schedule">${timeInfo}</div>
+                    </div>
+                    <div class="member-status ${statusClass}">${m.status}</div>
+                </div>`;
+            }).join('');
+        }
+        
+        async function showMemberSchedule(userId, userName) {
+            document.getElementById('memberScheduleTitle').textContent = `📅 ${userName}님 이번 주 일정`;
+            document.getElementById('memberScheduleModal').classList.add('show');
+            
+            // 로딩 표시
+            document.getElementById('memberScheduleContent').innerHTML = '<p style="text-align:center; color:#9ca3af;">불러오는 중...</p>';
+            
+            // 주간 일정 가져오기
+            const schedule = await fetch(`${API_BASE}/api/schedule/week/${userId}`).then(r => r.json());
+            const leaves = await fetch(`${API_BASE}/api/leave/user-week/${userId}`).then(r => r.json());
+            
+            const days = ['월', '화', '수', '목', '금'];
+            const today = new Date().toISOString().split('T')[0];
+            
+            let html = '<div style="margin-top:10px;">';
+            schedule.forEach((s, i) => {
+                const isToday = s.date === today;
+                const leave = leaves.find(l => l.date === s.date);
+                const leaveText = leave ? {annual: '🏖️ 연차', half_am: '🌅 오전반차', half_pm: '🌇 오후반차'}[leave.type] : null;
+                
+                html += `<div style="display:flex; justify-content:space-between; padding:12px; ${isToday ? 'background:#EEF2FF; border-radius:8px;' : 'border-bottom:1px solid #f3f4f6;'}">
+                    <div style="font-weight:${isToday ? '600' : '400'}; color:${isToday ? '#4F46E5' : '#1f2937'};">
+                        ${days[i]} ${isToday ? '(오늘)' : ''}
+                    </div>
+                    <div style="color:${leaveText ? '#F59E0B' : '#6b7280'};">
+                        ${leaveText || `${s.planned_in} ~ ${s.planned_out}`}
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+            
+            document.getElementById('memberScheduleContent').innerHTML = html;
+        }
+        
+        function closeMemberSchedule() {
+            document.getElementById('memberScheduleModal').classList.remove('show');
+        }
+        
+        // ==================== 휴가 ====================
+        async function loadLeaveInfo() {
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/user/${currentUser.id}`);
+                if (!res.ok) {
+                    console.error('사용자 정보 로드 실패');
+                    return;
+                }
+                const user = await res.json();
+                
+                const total = user.annual_leave_total || 15;
+                const used = user.annual_leave_used || 0;
+                const remaining = total - used;
+                
+                document.getElementById('leaveBalance').textContent = `${remaining}일`;
+                document.getElementById('leaveUsed').textContent = `사용: ${used}일 / 총: ${total}일`;
+                document.getElementById('totalAnnualLeave').value = total;
+                
+                // 휴가 내역
+                const leavesRes = await fetch(`${API_BASE}/api/leave/my/${currentUser.id}`);
+                const leaves = leavesRes.ok ? await leavesRes.json() : [];
+                
+                document.getElementById('leaveList').innerHTML = leaves.length 
+                    ? leaves.map(l => {
+                        const type = {annual: '연차', half_am: '오전반차', half_pm: '오후반차'}[l.type];
+                        return `<div class="member-card">
+                            <div class="member-info">
+                                <div class="member-name">${l.date}</div>
+                                <div class="member-schedule">${type}</div>
+                            </div>
+                            <button onclick="cancelLeave(${l.id})" style="color:#EF4444; border:none; background:none; cursor:pointer;">취소</button>
+                        </div>`;
+                    }).join('')
+                    : '<p style="color:#9ca3af; text-align:center; padding:20px;">등록된 휴가가 없습니다</p>';
+            } catch (e) {
+                console.error('loadLeaveInfo 오류:', e);
+                document.getElementById('leaveBalance').textContent = '15일';
+                document.getElementById('leaveUsed').textContent = '사용: 0일 / 총: 15일';
+            }
+        }
+        
+        function selectLeaveType(el, type) {
+            document.querySelectorAll('.leave-type-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedLeaveType = type;
+        }
+        
+        async function submitLeave() {
+            const date = document.getElementById('leaveDate').value;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/leave`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        date,
+                        type: selectedLeaveType
+                    })
+                });
+                
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail);
+                
+                showToast(data.message);
+                await loadLeaveInfo();
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        async function cancelLeave(leaveId) {
+            if (!confirm('휴가를 취소하시겠습니까?')) return;
+            
+            await fetch(`${API_BASE}/api/leave/${leaveId}`, { method: 'DELETE' });
+            showToast('휴가가 취소되었습니다');
+            await loadLeaveInfo();
+        }
+        
+        async function updateAnnualLeave() {
+            const total = parseFloat(document.getElementById('totalAnnualLeave').value);
+            
+            await fetch(`${API_BASE}/api/user/annual-leave`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    annual_leave_total: total
+                })
+            });
+            
+            showToast('연차 설정이 저장되었습니다');
+            await loadLeaveInfo();
+        }
+        
+        // ==================== 기록 수정 ====================
+        function openEditModal() {
+            document.getElementById('editModal').classList.add('show');
+        }
+        
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+        }
+        
+        async function saveEdit() {
+            const date = document.getElementById('editDate').value;
+            const clock_in = document.getElementById('editClockIn').value || null;
+            const clock_out = document.getElementById('editClockOut').value || null;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/attendance/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        date, clock_in, clock_out
+                    })
+                });
+                
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail);
+                
+                showToast(data.message);
+                closeEditModal();
+                await loadTodayAttendance();
+                await loadWeeklyAttendance();
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        // ==================== 유틸리티 ====================
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById(`${page}Page`).classList.add('active');
+            event.currentTarget.classList.add('active');
+            
+            // 페이지별 데이터 새로고침
+            if (page === 'team') loadTeamStatus();
+            if (page === 'leave') loadLeaveInfo();
+            if (page === 'admin') loadAdminStatus();
+        }
+        
+        async function loadAdminStatus() {
+            const data = await fetch(`${API_BASE}/api/admin/all-status`).then(r => r.json());
+            
+            document.getElementById('adminList').innerHTML = data.map(m => {
+                let statusClass = 'not-working';
+                if (m.status === '근무중') statusClass = 'working';
+                else if (m.status === '퇴근') statusClass = 'done';
+                else if (m.status.includes('차') || m.status === '연차') statusClass = 'leave';
+                
+                const emoji = m.name.charAt(0);
+                const hours = Math.floor((m.work_minutes || 0) / 60);
+                const mins = (m.work_minutes || 0) % 60;
+                const timeInfo = m.clock_in 
+                    ? (m.clock_out ? `${m.clock_in}~${m.clock_out} (${hours}시간 ${mins}분)` : `${m.clock_in} 출근`)
+                    : '-';
+                
+                const isAdmin = m.role === 'admin';
+                const roleBtn = isAdmin 
+                    ? `<button onclick="changeRole(${m.id}, 'member')" style="background:#EF4444; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:12px; cursor:pointer;">👑 해제</button>`
+                    : `<button onclick="changeRole(${m.id}, 'admin')" style="background:#4F46E5; color:white; border:none; padding:5px 10px; border-radius:5px; font-size:12px; cursor:pointer;">관리자 지정</button>`;
+                
+                return `<div class="member-card">
+                    <div class="member-avatar">${emoji}</div>
+                    <div class="member-info">
+                        <div class="member-name">${m.name} ${isAdmin ? '👑' : ''} <span style="font-size:12px; color:#9ca3af;">${m.team || ''}</span></div>
+                        <div class="member-schedule">${timeInfo}</div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
+                        <div class="member-status ${statusClass}">${m.status}</div>
+                        ${roleBtn}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        
+        async function changeRole(userId, newRole) {
+            const action = newRole === 'admin' ? '관리자로 지정' : '관리자 권한 해제';
+            if (!confirm(`이 사용자를 ${action}하시겠습니까?`)) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/user/role`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, role: newRole })
+                });
+                
+                const data = await res.json();
+                showToast(data.message);
+                await loadAdminStatus();
+            } catch (e) {
+                showToast('권한 변경 실패');
+            }
+        }
+        
+        // ==================== 관리자 탭 기능 ====================
+        async function loadAdminData() {
+            await loadAdminStatus();
+            await loadAdminTeams();
+        }
+        
+        function showAdminTab(tab) {
+            // 모든 탭 숨기기
+            document.getElementById('adminStatusTab').style.display = 'none';
+            document.getElementById('adminHoursTab').style.display = 'none';
+            document.getElementById('adminTeamTab').style.display = 'none';
+            
+            // 버튼 스타일 리셋
+            document.getElementById('adminTab1').style.background = '#e5e7eb';
+            document.getElementById('adminTab1').style.color = '#374151';
+            document.getElementById('adminTab2').style.background = '#e5e7eb';
+            document.getElementById('adminTab2').style.color = '#374151';
+            document.getElementById('adminTab3').style.background = '#e5e7eb';
+            document.getElementById('adminTab3').style.color = '#374151';
+            
+            // 선택된 탭 보이기
+            if (tab === 'status') {
+                document.getElementById('adminStatusTab').style.display = 'block';
+                document.getElementById('adminTab1').style.background = '#4F46E5';
+                document.getElementById('adminTab1').style.color = 'white';
+                loadAdminStatus();
+            } else if (tab === 'hours') {
+                document.getElementById('adminHoursTab').style.display = 'block';
+                document.getElementById('adminTab2').style.background = '#4F46E5';
+                document.getElementById('adminTab2').style.color = 'white';
+                loadAdminHours('week');
+            } else if (tab === 'team') {
+                document.getElementById('adminTeamTab').style.display = 'block';
+                document.getElementById('adminTab3').style.background = '#4F46E5';
+                document.getElementById('adminTab3').style.color = 'white';
+                loadAdminTeams();
+            }
+        }
+        
+        async function loadAdminHours(period) {
+            // 버튼 스타일
+            document.getElementById('hoursWeekBtn').style.background = period === 'week' ? '#4F46E5' : '#e5e7eb';
+            document.getElementById('hoursWeekBtn').style.color = period === 'week' ? 'white' : '#374151';
+            document.getElementById('hoursMonthBtn').style.background = period === 'month' ? '#4F46E5' : '#e5e7eb';
+            document.getElementById('hoursMonthBtn').style.color = period === 'month' ? 'white' : '#374151';
+            
+            try {
+                const data = await fetch(`${API_BASE}/api/admin/hours?period=${period}`).then(r => r.json());
+                
+                const periodLabel = period === 'week' ? '이번 주' : '이번 달';
+                const targetHours = period === 'week' ? 40 : 160;
+                
+                document.getElementById('adminHoursList').innerHTML = data.map(m => {
+                    const hours = Math.round(m.total_minutes / 60 * 10) / 10;
+                    const percent = Math.min(100, Math.round(m.total_minutes / 60 / targetHours * 100));
+                    const color = percent >= 100 ? '#10B981' : (percent >= 70 ? '#F59E0B' : '#EF4444');
+                    
+                    return `<div class="member-card">
+                        <div class="member-avatar">${m.name.charAt(0)}</div>
+                        <div class="member-info" style="flex:1;">
+                            <div class="member-name">${m.name} <span style="font-size:12px; color:#9ca3af;">${m.team || ''}</span></div>
+                            <div style="margin-top:5px;">
+                                <div style="background:#e5e7eb; height:8px; border-radius:4px; overflow:hidden;">
+                                    <div style="background:${color}; height:100%; width:${percent}%;"></div>
+                                </div>
+                                <div style="font-size:12px; color:#6b7280; margin-top:3px;">${hours}시간 / ${targetHours}시간 (${percent}%)</div>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                console.error('근무시간 로드 실패:', e);
+            }
+        }
+        
+        async function loadAdminTeams() {
+            try {
+                const teams = await fetch(`${API_BASE}/api/teams`).then(r => r.json());
+                
+                document.getElementById('adminTeamList').innerHTML = teams.map(t => `
+                    <div class="member-card">
+                        <div class="member-avatar">🏢</div>
+                        <div class="member-info">
+                            <div class="member-name">${t.name}</div>
+                        </div>
+                        <button onclick="deleteTeam(${t.id}, '${t.name}')" style="color:#EF4444; border:none; background:none; cursor:pointer; font-size:18px;">🗑️</button>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('팀 목록 로드 실패:', e);
+            }
+        }
+        
+        async function createTeam() {
+            const name = document.getElementById('newTeamName').value.trim();
+            if (!name) {
+                showToast('팀 이름을 입력하세요');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/teams`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail);
+                
+                showToast('팀이 생성되었습니다!');
+                document.getElementById('newTeamName').value = '';
+                await loadAdminTeams();
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        async function deleteTeam(teamId, teamName) {
+            if (!confirm(`"${teamName}" 팀을 삭제하시겠습니까?`)) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/teams/${teamId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail);
+                
+                showToast('팀이 삭제되었습니다');
+                await loadAdminTeams();
+            } catch (e) {
+                showToast(e.message);
+            }
+        }
+        
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
